@@ -105,7 +105,7 @@ fn clean_env_cli_reaches_mock_anthropic_service_across_scripted_parity_scenarios
             stdin: Some("y\n"),
             prepare: prepare_noop,
             assert: assert_bash_permission_prompt_approved,
-            extra_env: None,
+            extra_env: Some(("CLAW_STDIN_IS_INTERACTIVE", "1")),
             resume_session: None,
         },
         ScenarioCase {
@@ -115,7 +115,7 @@ fn clean_env_cli_reaches_mock_anthropic_service_across_scripted_parity_scenarios
             stdin: Some("n\n"),
             prepare: prepare_noop,
             assert: assert_bash_permission_prompt_denied,
-            extra_env: None,
+            extra_env: Some(("CLAW_STDIN_IS_INTERACTIVE", "1")),
             resume_session: None,
         },
         ScenarioCase {
@@ -183,10 +183,12 @@ fn clean_env_cli_reaches_mock_anthropic_service_across_scripted_parity_scenarios
     }
 
     let captured = runtime.block_on(server.captured_requests());
+    // Each of the 21 /v1/messages calls is preceded by a count_tokens
+    // preflight (be561bf), so the mock sees 42 requests in total.
     assert_eq!(
         captured.len(),
-        21,
-        "twelve scenarios should produce twenty-one requests"
+        42,
+        "twelve scenarios should produce twenty-one message requests plus their count_tokens preflights"
     );
     assert!(captured
         .iter()

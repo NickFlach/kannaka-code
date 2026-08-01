@@ -126,6 +126,12 @@ fn read_piped_stdin() -> Option<String> {
     if io::stdin().is_terminal() {
         return None;
     }
+    // Piped stdin is normally prompt context, which makes it unavailable to
+    // the permission approval prompt. Scripts (and the parity harness) that
+    // instead feed prompt ANSWERS through stdin declare it explicitly.
+    if env::var("CLAW_STDIN_IS_INTERACTIVE").is_ok_and(|value| value == "1") {
+        return None;
+    }
     let mut buffer = String::new();
     if io::stdin().read_to_string(&mut buffer).is_err() {
         return None;
