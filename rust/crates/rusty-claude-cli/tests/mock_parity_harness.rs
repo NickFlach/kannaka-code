@@ -190,12 +190,21 @@ fn clean_env_cli_reaches_mock_anthropic_service_across_scripted_parity_scenarios
         42,
         "twelve scenarios should produce twenty-one message requests plus their count_tokens preflights"
     );
-    assert!(captured
+    assert!(captured.iter().all(|request| {
+        request.path == "/v1/messages" || request.path == "/v1/messages/count_tokens"
+    }));
+    let message_requests = captured
         .iter()
-        .all(|request| request.path == "/v1/messages"));
-    assert!(captured.iter().all(|request| request.stream));
+        .filter(|request| request.path == "/v1/messages")
+        .collect::<Vec<_>>();
+    assert_eq!(
+        message_requests.len(),
+        21,
+        "twelve scenarios should produce twenty-one message requests"
+    );
+    assert!(message_requests.iter().all(|request| request.stream));
 
-    let scenarios = captured
+    let scenarios = message_requests
         .iter()
         .map(|request| request.scenario.as_str())
         .collect::<Vec<_>>();
@@ -227,7 +236,7 @@ fn clean_env_cli_reaches_mock_anthropic_service_across_scripted_parity_scenarios
     );
 
     let mut request_counts = BTreeMap::new();
-    for request in &captured {
+    for request in &message_requests {
         *request_counts
             .entry(request.scenario.as_str())
             .or_insert(0_usize) += 1;

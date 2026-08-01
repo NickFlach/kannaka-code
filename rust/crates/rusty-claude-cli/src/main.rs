@@ -4387,10 +4387,21 @@ fn is_managed_session_file(path: &Path) -> bool {
 
 fn list_managed_sessions() -> Result<Vec<ManagedSessionSummary>, Box<dyn std::error::Error>> {
     let mut sessions = Vec::new();
-    for entry in fs::read_dir(sessions_dir()?)? {
+    let namespaced_dir = sessions_dir()?;
+    // Sessions saved before workspace fingerprinting live flat in the parent
+    // .claw/sessions/ directory; keep listing them alongside namespaced ones.
+    let mut directories = vec![namespaced_dir.clone()];
+    if let Some(flat_dir) = namespaced_dir.parent() {
+        directories.push(flat_dir.to_path_buf());
+    }
+    let entries = directories
+        .iter()
+        .filter_map(|directory| fs::read_dir(directory).ok())
+        .flatten();
+    for entry in entries {
         let entry = entry?;
         let path = entry.path();
-        if !is_managed_session_file(&path) {
+        if !is_managed_session_file(&path) || !path.is_file() {
             continue;
         }
         let metadata = entry.metadata()?;
