@@ -4358,6 +4358,16 @@ fn resolve_managed_session_path(session_id: &str) -> Result<PathBuf, Box<dyn std
             return Ok(path);
         }
     }
+    // Sessions saved before workspace fingerprinting live flat in
+    // .claw/sessions/ (the namespaced dir's parent); keep resolving them.
+    if let Some(flat_directory) = directory.parent() {
+        for extension in [PRIMARY_SESSION_EXTENSION, LEGACY_SESSION_EXTENSION] {
+            let path = flat_directory.join(format!("{session_id}.{extension}"));
+            if path.exists() {
+                return Ok(path);
+            }
+        }
+    }
     Err(format_missing_session_reference(session_id).into())
 }
 
@@ -8968,7 +8978,7 @@ mod tests {
             parse_args(&["help".to_string(), "me".to_string(), "debug".to_string()])
                 .expect("prompt shorthand should still work"),
             CliAction::Prompt {
-                prompt: "$help overview".to_string(),
+                prompt: "help me debug".to_string(),
                 model: DEFAULT_MODEL.to_string(),
                 output_format: CliOutputFormat::Text,
                 allowed_tools: None,
@@ -9285,7 +9295,9 @@ mod tests {
         assert!(help.contains("/diff"));
         assert!(help.contains("/version"));
         assert!(help.contains("/export [file]"));
-        assert!(help.contains("/session [list|switch <session-id>|fork [branch-name]]"));
+        assert!(help.contains(
+            "/session [list|switch <session-id>|fork [branch-name]|delete <session-id> [--force]]"
+        ));
         assert!(help.contains(
             "/plugin [list|install <path>|enable <name>|disable <name>|uninstall <id>|update <id>]"
         ));
