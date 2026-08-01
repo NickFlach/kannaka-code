@@ -337,7 +337,13 @@ impl CommandWithStdin {
         let mut child = self.command.spawn()?;
         if let Some(mut child_stdin) = child.stdin.take() {
             use std::io::Write as _;
-            child_stdin.write_all(stdin)?;
+            // A hook that exits without reading its stdin payload closes the
+            // pipe; that's not a hook failure, so EPIPE must not surface as one.
+            if let Err(error) = child_stdin.write_all(stdin) {
+                if error.kind() != std::io::ErrorKind::BrokenPipe {
+                    return Err(error);
+                }
+            }
         }
         child.wait_with_output()
     }
