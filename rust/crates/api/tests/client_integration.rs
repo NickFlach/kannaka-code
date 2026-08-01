@@ -106,9 +106,15 @@ async fn send_message_posts_json_and_parses_response() {
 #[tokio::test]
 async fn send_message_blocks_oversized_requests_before_the_http_call() {
     let state = Arc::new(Mutex::new(Vec::<CapturedRequest>::new()));
+    // Preflight counts input via the count_tokens endpoint (be561bf); queue a
+    // count that overflows the 200k context window once max_tokens is added.
     let server = spawn_server(
         state.clone(),
-        vec![http_response("200 OK", "application/json", "{}")],
+        vec![http_response(
+            "200 OK",
+            "application/json",
+            r#"{"input_tokens":150000}"#,
+        )],
     )
     .await;
 
@@ -132,9 +138,12 @@ async fn send_message_blocks_oversized_requests_before_the_http_call() {
         .expect_err("oversized request should fail local context-window preflight");
 
     assert!(matches!(error, ApiError::ContextWindowExceeded { .. }));
+    let captured = state.lock().await;
     assert!(
-        state.lock().await.is_empty(),
-        "preflight failure should avoid any upstream HTTP request"
+        captured
+            .iter()
+            .all(|request| request.path.ends_with("/count_tokens")),
+        "preflight failure should reach count_tokens only, never /v1/messages"
     );
 }
 

@@ -185,6 +185,14 @@ const TOP_LEVEL_FIELDS: &[FieldSpec] = &[
         name: "env",
         expected: FieldType::Object,
     },
+    FieldSpec {
+        name: "aliases",
+        expected: FieldType::Object,
+    },
+    FieldSpec {
+        name: "providerFallbacks",
+        expected: FieldType::Object,
+    },
 ];
 
 const HOOKS_FIELDS: &[FieldSpec] = &[
@@ -307,6 +315,14 @@ const DEPRECATED_FIELDS: &[DeprecatedField] = &[
         name: "enabledPlugins",
         replacement: "plugins.enabled",
     },
+    DeprecatedField {
+        name: "allowedTools",
+        replacement: "permissions.allow",
+    },
+    DeprecatedField {
+        name: "ignorePatterns",
+        replacement: "permissions.deny",
+    },
 ];
 
 // ---- line-number resolution ----
@@ -364,6 +380,21 @@ fn validate_object_keys(
                     },
                 });
             }
+        } else if let Some(deprecated) = prefix
+            .is_empty()
+            .then(|| DEPRECATED_FIELDS.iter().find(|d| d.name == key))
+            .flatten()
+        {
+            // Removed key we still recognize: error with replacement guidance
+            // instead of a generic unknown-key report.
+            result.errors.push(ConfigDiagnostic {
+                path: path_display.to_string(),
+                field: field_path,
+                line: find_key_line(source, key),
+                kind: DiagnosticKind::Deprecated {
+                    replacement: deprecated.replacement,
+                },
+            });
         } else {
             // Unknown key.
             let suggestion = suggest_field(key, &known_names);
@@ -427,9 +458,12 @@ pub fn validate_config_file(
     let path_display = file_path.display().to_string();
     let mut result = validate_object_keys(object, TOP_LEVEL_FIELDS, "", source, &path_display);
 
-    // Check deprecated fields.
+    // Check deprecated fields. Deprecated keys still in TOP_LEVEL_FIELDS load
+    // with a warning; removed ones already errored (with guidance) above.
     for deprecated in DEPRECATED_FIELDS {
-        if object.contains_key(deprecated.name) {
+        if object.contains_key(deprecated.name)
+            && TOP_LEVEL_FIELDS.iter().any(|f| f.name == deprecated.name)
+        {
             result.warnings.push(ConfigDiagnostic {
                 path: path_display.clone(),
                 field: deprecated.name.to_string(),
