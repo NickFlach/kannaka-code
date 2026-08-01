@@ -10,26 +10,6 @@ use crate::sandbox::{FilesystemIsolationMode, SandboxConfig};
 pub const CLAW_SETTINGS_SCHEMA_NAME: &str = "SettingsSchema";
 
 /// Top-level settings keys recognized by the runtime configuration loader.
-const KNOWN_TOP_LEVEL_KEYS: &[&str] = &[
-    "$schema",
-    "enabledPlugins",
-    "env",
-    "hooks",
-    "mcpServers",
-    "model",
-    "oauth",
-    "permissionMode",
-    "permissions",
-    "plugins",
-    "sandbox",
-];
-
-/// Deprecated top-level keys mapped to their replacement guidance.
-const DEPRECATED_TOP_LEVEL_KEYS: &[(&str, &str)] = &[
-    ("allowedTools", "permissions.allow"),
-    ("ignorePatterns", "permissions.deny"),
-];
-
 /// Origin of a loaded settings file in the configuration precedence chain.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ConfigSource {
@@ -1931,11 +1911,12 @@ mod tests {
         // then
         let rendered = error.to_string();
         assert!(
-            rendered.contains(&format!("{}:3:", user_settings.display())),
+            rendered.contains(&user_settings.display().to_string())
+                && rendered.contains("(line 3)"),
             "error should include file path and line number, got: {rendered}"
         );
         assert!(
-            rendered.contains("unknown field telemetry"),
+            rendered.contains("unknown key \"telemetry\""),
             "error should name the offending field, got: {rendered}"
         );
 
@@ -1965,11 +1946,12 @@ mod tests {
         // then
         let rendered = error.to_string();
         assert!(
-            rendered.contains(&format!("{}:3:", user_settings.display())),
+            rendered.contains(&user_settings.display().to_string())
+                && rendered.contains("(line 3)"),
             "error should include file path and line number, got: {rendered}"
         );
         assert!(
-            rendered.contains("deprecated field allowedTools"),
+            rendered.contains("field \"allowedTools\" is deprecated"),
             "error should call out the deprecated field, got: {rendered}"
         );
         assert!(
@@ -2003,11 +1985,12 @@ mod tests {
         // then
         let rendered = error.to_string();
         assert!(
-            rendered.contains(&format!("{}: hooks", user_settings.display())),
+            rendered.contains(&user_settings.display().to_string())
+                && rendered.contains("\"hooks.PreToolUse\""),
             "error should include file path and field path, got: {rendered}"
         );
         assert!(
-            rendered.contains("PreToolUse must be an array"),
+            rendered.contains("must be an array of strings"),
             "error should describe the type mismatch, got: {rendered}"
         );
 
@@ -2033,11 +2016,11 @@ mod tests {
         // then
         let rendered = error.to_string();
         assert!(
-            rendered.contains("unknown field modle"),
+            rendered.contains("unknown key \"modle\""),
             "error should name the offending field, got: {rendered}"
         );
         assert!(
-            rendered.contains("did you mean model?"),
+            rendered.contains("Did you mean \"model\"?"),
             "error should suggest the closest known key, got: {rendered}"
         );
 
